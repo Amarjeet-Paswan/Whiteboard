@@ -1,0 +1,190 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Administator</title>
+</head>
+<body>
+    <!-- <h1>Amarjeet</h1> -->
+     <canvas id="canvas" style="border: 2px solid black;">Your browser not supporting canvas</canvas>
+     <button style="
+     height: 50px;
+     width: 50px;
+     margin: 5px;" onclick="undo()">Undo</button>
+
+     <button style="
+     height: 50px;
+     width: 50px;
+     margin: 5px;" onclick="redo()">Redo</button>
+
+     <button style="
+     height: 50px;
+     width: 50px;
+     margin: 5px;" onclick="clearCanvas()">Clear</button>
+
+     <div style="
+     height: 50px;
+     width: 50px;
+     display: inline-block;
+     margin: 5px;
+     background-color: black;
+     "onclick="change('black')"></div>
+
+     <div style="
+     height: 50px;
+     width: 50px;
+     display: inline-block;
+     margin: 5px;
+     background-color: red;
+     "onclick="change('red')"></div>
+
+     <div style="
+     height: 50px;
+     width: 50px;
+     display: inline-block;
+     margin: 5px;
+     background-color:green;
+     " onclick="change('green')"></div>
+
+     <div style="
+     height: 50px;
+     width: 50px;
+     display: inline-block;
+     margin: 5px;
+     background-color: blue;
+     " onclick="change('blue')"></div>
+
+     <div style="
+     height: 50px;
+     width: 50px;
+     display: inline-block;
+     margin: 5px;
+     background-image: url('/eraser.jpg');
+     background-size: cover;background-position: center;
+     "onclick="change('white')"></div>
+
+     <input type="range"max="20" min="1" oninput="changeWidht()"id = "slider" value="3">
+      
+     <script>
+        var canvas = document.getElementById("canvas");
+        var ctx = canvas.getContext("2d");
+        let undoStack = [];
+        let redoStack = [];
+        let ws = new WebSocket("ws://localhost:5000");
+
+        canvas.height = window.innerHeight*0.8;
+        canvas.width = window.innerWidth*0.99;
+
+        window.addEventListener("resize",()=>{
+           canvas.height = window.innerHeight*0.8;
+           canvas.width = window.innerWidth*0.99; 
+        });
+
+
+        let paint = false;
+        
+        function saveState(){
+            undoStack.push(canvas.toDataURL());
+            redoStack = [];
+        };
+ 
+        function undo(){
+            if(undoStack.length==0)return;
+            redoStack.push(canvas.toDataURL());
+            let previousState = undoStack.pop();
+            restoreCanvas(previousState);
+            ws.send(JSON.stringify({
+                type : "undo",
+                state : previousState
+            }));
+        };
+
+        function restoreCanvas(dataURL){
+            let image = new Image();
+
+            image.onload = function(){
+                ctx.clearRect(0,0,canvas.width,canvas.height);
+                ctx.drawImage(image,0,0);
+            };
+            image.src = dataURL;
+        };
+
+        function redo(){
+            if(redoStack.length==0)return;
+            undoStack.push(canvas.toDataURL());
+            let nextState = redoStack.pop();
+            restoreCanvas(nextState);
+            ws.send(JSON.stringify({
+                type : "redo",
+                state : nextState
+            }));
+        };
+        
+        function clearCanvas(){
+            saveState();
+            ctx.clearRect(0,0,canvas.width,canvas.height);
+            ws.send(JSON.stringify({
+                type :"clear"
+            }));
+        };
+
+        function startDraw(event){
+            saveState();
+            paint = true;
+            var info = {
+                width : ctx.lineWidth,
+                style : ctx.strokeStyle,
+                x : event.clientX,
+                y : event.clientY,
+                type :"start"
+            }
+            ws.send(JSON.stringify(info));
+            // ctx.beginPath();
+            // ctx.moveTo(event.clientX, event.clientY);
+        };
+        function endDraw(event){
+            paint = false;
+            ctx.beginPath();
+            var info = {
+                width : ctx.lineWidth,
+                style : ctx.strokeStyle,
+                x : event.clientX,
+                y : event.clientY,
+                type :"end"
+            }
+            ws.send(JSON.stringify(info));
+        };
+        function draw(event){
+            if(!paint)return;
+            ctx.lineCap = "round";
+            ctx.lineTo(event.clientX,event.clientY);
+            ctx.stroke();
+            ctx.beginPath();
+            ctx.moveTo(event.clientX, event.clientY);
+            var info = {
+                width : ctx.lineWidth,
+                style : ctx.strokeStyle,
+                x : event.clientX,
+                y : event.clientY,
+                type :"draw"
+            }
+            ws.send(JSON.stringify(info));
+        };
+
+        function changeWidht(){
+            ctx.lineWidth = document.getElementById("slider").value;
+        };
+
+        function change(value){
+            ctx.strokeStyle = value;
+        };
+
+        canvas.addEventListener("mousedown",startDraw);
+        canvas.addEventListener("mouseup",endDraw);
+        canvas.addEventListener("mousemove",draw);
+
+
+     </script>
+</body>
+</html>

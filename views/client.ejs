@@ -1,0 +1,79 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Client</title>
+</head>
+<body>
+    <!-- <h1>Amarjeet</h1> -->
+     <canvas id="canvas" style="border: 2px solid black;">Your browser not supporting canvas</canvas>
+
+     <script>
+        var canvas = document.getElementById("canvas");
+        var ctx = canvas.getContext("2d");
+
+        let ws = new WebSocket("ws://localhost:5000");
+        ws.onmessage = (message)=>{
+          var info = JSON.parse(message.data);
+          if(info.type==="undo"){
+            restoreCanvas(info.state);
+          }
+          if(info.type==="redo"){
+            restoreCanvas(info.state);
+          }
+          if(info.type==="clear"){
+            ctx.clearRect(0,0,canvas.width,canvas.height);
+          }
+          if(info.type==="end"){
+            endDraw();
+          }
+          if(info.type==="start"){
+            startDraw();
+          }
+          if(info.type==="draw"){
+            ctx.lineWidth = info.width;
+            ctx.strokeStyle = info.style;
+            draw(info.x,info.y);
+          }
+        };
+
+        canvas.height = window.innerHeight*0.8;
+        canvas.width = window.innerWidth*0.99;
+
+        window.addEventListener("resize",()=>{
+          canvas.height = window.innerHeight*0.8;
+          canvas.width = window.innerWidth*0.99; 
+        });
+
+
+        let paint = false;
+        function restoreCanvas(dataURL){
+            let image = new Image();
+
+            image.onload = function(){
+                ctx.clearRect(0,0,canvas.width,canvas.height);
+                ctx.drawImage(image,0,0);
+            };
+            image.src = dataURL;
+        };
+
+        function startDraw(){
+          paint = true;
+        };
+        function endDraw(){
+          paint = false;
+          ctx.beginPath();
+        };
+        function draw(x,y){
+          if(!paint)return;
+          ctx.lineCap = "round";
+          ctx.lineTo(x,y);
+          ctx.stroke();
+          ctx.beginPath();
+          ctx.moveTo(x, y);
+            
+        };
+     </script>
+</body>
+</html>
